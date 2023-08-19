@@ -1,10 +1,11 @@
 defmodule Issues.CLI do
+  import Issues.TableFormatter, only: [print_table_for_columns: 2]
   @default_count 4
   @moduledoc """
   명령줄 파싱을 수행한 뒤, 각종 함수를 호출해
   깃허브 프로젝트의 최근 _n_개 이슈를 표 형식으로 만들어 출력한다.
   """
-  def run(argv) do
+  def main(argv) do
     argv
     |> parse_args
     |> process
@@ -42,9 +43,12 @@ defmodule Issues.CLI do
     System.halt(0)
   end
 
-  def process({user, project, _}) do
+  def process({user, project, count}) do
     Issues.GithubIssues.fetch(user, project)
     |> decode_response
+    |> sort_into_descending_order
+    |> last(count)
+    |> print_table_for_columns(["number", "created_at", "title"])
   end
 
   def decode_response({:ok, body}), do: body
@@ -52,5 +56,18 @@ defmodule Issues.CLI do
   def decode_response({:error, error}) do
     IO.puts("Error fetching from Github: #{error["message"]}")
     System.halt(2)
+  end
+
+  def sort_into_descending_order(list_of_issues) do
+    list_of_issues
+    |> Enum.sort(fn i1, i2 ->
+      i1["created_at"] >= i2["created_at"]
+    end)
+  end
+
+  def last(list, count) do
+    list
+    |> Enum.take(count)
+    |> Enum.reverse()
   end
 end
